@@ -7,8 +7,8 @@ export default function App() {
   const [result, setResult] = useState('');
 
   const buttonPressed = (lasku) => {
-    let eka = parseFloat(luku1);
-    let toka = parseFloat(luku2);
+    let eka = Number(luku1);
+    let toka = Number(luku2);
 
     if (lasku === '+') {
       setResult(`Result: ${eka + toka}`);
