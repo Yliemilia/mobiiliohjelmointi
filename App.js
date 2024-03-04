@@ -1,88 +1,88 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, StatusBar, View, TextInput, Text, Alert, Button } from 'react-native';
-import { Picker } from '@react-native-picker/picker'
+import { StyleSheet, StatusBar, View, TextInput, Button, KeyboardAvoidingView } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
+import * as Location from 'expo-location';
 
 export default function App() {
 
-  const [rates, setRates] = useState({});
-  const [selected, setSelected] = useState('');
-  const [amount, setAmount] = useState('');
-  const [eur, setEur] = useState('');
+  const initial = {
+    latitude: 60.200692,
+    longitude: 24.934302,
+    latitudeDelta: 0.0322,
+    longitudeDelta: 0.0221
+  };
 
-  const API_KEY = process.env.EXPO_PUBLIC_API_KEY;
+  const [region, setRegion] = useState(initial);
+  const [address, setAddress] = useState('');
 
-  const getData = async () => {
-    const url = 'https://api.apilayer.com/exchangerates_data/latest';
-    const options = {
-      headers: {
-        apikey: API_KEY
+  useEffect(() => {
+    const fetchLocation = async() => {
+      let {status} = await Location.requestBackgroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('No permission');
+      } else {
+        try {
+          let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High});
+          console.log(location)
+          setRegion({ ...region, latitude: location.coords.latitude, longitude: location.coords.longitude});
+        } catch (error) {
+          console.log(error.message);
+        }
       }
-    };
-
-    try {
-      const response = await fetch(url, options);
-      console.log('Response status', response.status);
-      const currencyData = await response.json();
-      console.log(currencyData);
-      setRates(currencyData.rates);
-    } catch (e) {
-      Alert.alert('Error fetching data');
     }
-  }
+    fetchLocation();
+  }, []);
 
-  useEffect(() => { getData() }, []);
+  const fetchCoordinates = (address) => {
+    const KEY = process.env.EXPO_PUBLIC_MAP_API_KEY;
+    const url = `https://geocode.maps.co/search?q=${address}&api_key=${KEY}`;
 
-  const convert = () => {
-    console.log("Selected currency rate:", rates[selected]);
-    if (!rates[selected]) {
-      Alert.alert('Error')
-      return;
-    }
-    const amountEur = Number(amount)/rates[selected];
-    setEur(`${amountEur.toFixed(2)}€`);
-  }
+    fetch(url)
+    .then(response=> response.json())
+    .then(data => {
+      const lat = parseFloat(data[0].lat);
+      const lng = parseFloat(data[0].lon);
+      console.log(lat, lng);
 
-  return (
-    <View style ={styles.container}>
-      <Text style={{ ...styles.valuerow, ...styles.text}}>{eur}</Text>
-      <View style={styles.inputrow}>
-        <TextInput
-        style={styles.text}
-        placeholder={'Amount'}
-        keyboardType='numeric'
-        value={amount}
-        onChangeText={text => setAmount(text)}/>
-        <Picker style={styles.picker}
-        selectedValue={selected}
-        onValueChange={(itemValue, itemIndex) => {
-          console.log(itemValue, itemIndex);
-          setSelected(itemValue);
-        }}
-        >
-          {Object.keys(rates).sort().map(key => (<Picker.Item label={key} value ={key} key={key} />))}
-        </Picker>
-      </View>
-      <Button style={styles.button} title='Convert' onPress={convert}/>
+      setRegion({ ...region, latitude: lat, longitude: lng})
+  })
+  .catch(error => console.error('API call failed', error.message))
+}
+
+return (
+  <KeyboardAvoidingView style={styles.container} behavior='padding'>
+    <MapView
+      style={styles.map}
+      region={region}>
+      <Marker coordinate={region}/>
+    </MapView>
+    <TextInput style={styles.input} placeholder= {'Address'} value={address}
+    onChangeText={text => setAddress(text)}/>
+    <View style={styles.button}>
+      <Button title='Show' onPress={() => fetchCoordinates(address)}/>
     </View>
-  )
+  </KeyboardAvoidingView>
+);
 }
 
 const styles = StyleSheet.create({
   container: {
     paddingTop: StatusBar.currentHeight,
-    flex: 1,
+    flex: 10,
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 30
   },
-  text: {
-    fontSize: 30,
-    padding: 10
+  map: {
+    flex: 7,
+    width: "100%",
+    height: "75%"
   },
-  picker: {
-    width: 150
+  textinput: {
+    flex: 1
   },
-  button:{
-    borderBlockColor: "blue"
+  button: {
+    flex: 1,
   }
-})
+});
